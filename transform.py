@@ -1,5 +1,3 @@
-### ETL
-
 import pandas as pd
 
 ##### VALIDATION FUNCTION
@@ -42,15 +40,10 @@ def validate_data(df, schema):
                 validation_issues.append(f"Column '{col}' must contain float values. Found type: {df[col].dtype}.")
 
         elif expected == "boolean":
-            # Validate boolean columns
-            df[col] = df[col].map({"yes": True, "no": False, "none": None})
+            invalid_values = df[col][~df[col].isin([True, False, None])].unique()
+            if len(invalid_values) > 0:
+                validation_issues.append(f"Column '{col}' contains invalid values that could not be converted to boolean. Invalid entries: {invalid_values.tolist()}")
 
-            # Check for invalid values that could not be converted
-            if df[col].isnull().any():
-                # Collect invalid values for debugging
-                invalid_values = df[col][df[col].isnull()].index.tolist()
-                validation_issues.append(f"Column '{col}' contains invalid values that could not be converted to boolean. Invalid entries: {invalid_values}")
-                
     if validation_issues:
         raise ValidationError("Data validation issues found:\n" + "\n".join(validation_issues ))
 
@@ -59,6 +52,12 @@ def fill_missing_numeric(df, columns):
     for col in columns:
         if col in df.columns:
             df[col].fillna(df[col].median(), inplace=True)
+    return df
+
+def convert_float_to_int(df, columns):
+    for col in columns:
+        if col in df.columns and pd.api.types.is_float_dtype(df[col]):
+            df[col] = df[col].fillna(0).astype(int)
     return df
 
 # Transformation function: Fill missing values for categorical columns
@@ -86,24 +85,8 @@ def clean_data(df):
 
     # Clean purpose
     df['purpose'] = df['purpose'].replace({
-        'radio/tv': 'television',
-        'education': 'furniture/equipment',  # Assuming a valid purpose
-        'new car': 'car',
-        'used car': 'car',
-        'business': 'furniture/equipment',
-        'domestic appliance': 'furniture/equipment',
-        'repairs': 'furniture/equipment',
-        'other': 'furniture/equipment',
-        'retraining': 'furniture/equipment'
+        'unknown': 'other',
     })
-
-    # Convert numeric columns to integers, handling non-integer values
-    numeric_columns = ["duration", "credit_amount", "residence_since", "age", "existing_credits", "num_dependents"]
-    for col in numeric_columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')  # Convert to numeric, set errors to NaN
-
-    # Fill NaN values with 0 or appropriate values
-    df[numeric_columns] = df[numeric_columns].fillna(0)  # You can adjust this as necessary
 
     # Clean savings_status
     df['savings_status'] = df['savings_status'].replace({
@@ -126,12 +109,53 @@ def clean_data(df):
 
     # Clean own_telephone
     df['own_telephone'] = df['own_telephone'].replace({
-        'none': 'no'
-    })
+        'none': False})
+    df['own_telephone'] = df['own_telephone'].map({"yes": True, "no": False})
+    df['own_telephone'] = df['own_telephone'].fillna(False)
 
+     # Clean foreign_worker 
+    df['foreign_worker'] = df['foreign_worker'].replace({
+        'no': False,
+        'yes': True
+    })
+    df['foreign_worker'] = df['foreign_worker'].fillna(False)
+    
     # Clean housing
     df['housing'] = df['housing'].replace({
         'for free': 'free'
     })
+
+    return df
+
+def clean_boolean_columns(df, columns):
+    for col in columns:
+        if col in df.columns:
+            # Replace specific values and map to boolean
+            df[col] = df[col].replace({'none': False})
+            df[col] = df[col].map({"yes": True, "no": False})
+            
+            # Fill NaNs with False
+            df[col] = df[col].fillna(False)
+    
+    return df
+
+def split_personal_status(df, column_name):
+    if column_name in df.columns:
+        # Create new columns by splitting the personal_status values
+        df[['sex', 'marital_status']] = df[column_name].str.split(' ', n=1, expand=True)
+        
+        # Clean up the marital_status to retain only relevant information
+        df['marital_status'] = df['marital_status'].replace({
+            'div/sep': 'divorced/separated',
+            'div/dep/mar': 'divorced/dependent/married',
+            'single': 'single',
+            'mar/wid': 'married/widowed'
+        })
+        
+        # Handle cases where marital_status may not be clear
+        df['marital_status'] = df['marital_status'].fillna('unknown')
+
+        # Optionally drop the original personal_status column
+        df.drop(columns=[column_name], inplace=True)
 
     return df

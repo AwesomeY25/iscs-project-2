@@ -1,28 +1,36 @@
 import pandas as pd
-from transform import clean_data, fill_missing_numeric, fill_missing_categorical, validate_data
+from transform import clean_data, clean_boolean_columns, fill_missing_numeric, fill_missing_categorical, convert_float_to_int, split_personal_status, validate_data
 
 # File paths
 input_file_path = "credit_customer_data.csv"
 output_file_path = "credit_customer_data_cleaned.csv"
 
-# Schema definition
+# Define expected schema
 expected_schema = {
     "checking_status": ["<0", "0<=X<20000", ">=20000", "no checking account"],
     "duration": "integer",
-    "credit_history": ["no credits taken/all paid back duly", "existing paid", "delayed previously", "critical/other existing credit", "unknown"],
-    "purpose": ["car", "television", "furniture/equipment", "used car", "business", "domestic appliance", "repairs", "other", "retraining", "unknown"],
+    "credit_history": ["no credits taken/all paid back duly",
+                       "existing paid",
+                       "delayed previously",
+                       "critical/other existing credit",
+                       "unknown"],
+    "purpose": ["car",
+                "radio/tv",
+                "education",
+                "new car",
+                "used car", 
+                'business', 
+                'repairs',
+                'other',
+                'retraining',
+                "furniture/equipment",
+                "domestic appliance"],
     "credit_amount": "integer",
     "savings_status": ["<100", "100<=X<1000", "1000<=X<10000", ">=10000", "no known savings account", "unknown"],
     "employment": ["unemployed", "<1", "1<=X<4", "4<=X<7", ">=7"],
     "installment_commitment": "float",
-    "personal_status": [
-        "male div/sep",
-        "female div/dep/mar",
-        "male single",
-        "male mar/wid",
-        "female single",
-        "unknown"
-    ],
+    "marital_status": ['divorced/separated', 'divorced/dependent/married','single', 'married/widowed'],
+    "sex": ["female", "male", "unknown"],
     "other_parties": ["none", "co-applicant", "guarantor", "unknown"],
     "residence_since": "integer",
     "property_magnitude": ["real estate", "life insurance", "car", "no known property", "unknown"],
@@ -37,22 +45,32 @@ expected_schema = {
     "class": ["good", "bad"],
 }
 
-##### VALIDATION FUNCTION
-class ValidationError(Exception):
-    pass
-
 ##### EXTRACT
 def extract(file_path):
-    df = pd.read_csv(file_path)
-    df.dtypes
-    return df
+    try:        
+        df = pd.read_csv(file_path)
+        print(f"File is successfully extracted from {file_path}")
+        return df
+    except:
+        print(f"There is an error loading your file in: {file_path}. Please check before trying again.")
 
 ##### TRANSFORM
 def transform(df):
     # Clean the data
     df = clean_data(df)
+    
+    # Clean specified boolean columns
+    boolean_to_clean = ['own_telephone', 'foreign_worker']
+    df = clean_boolean_columns(df, boolean_to_clean)
+    
+    # Convert specific float columns to integer
+    floats_to_integers = ["duration", "credit_amount", "residence_since", "age", "existing_credits", "num_dependents"]
+    df = convert_float_to_int(df, floats_to_integers)
+    
+    # Split personal_status into sex and marital_status
+    df = split_personal_status(df, 'personal_status')
 
-    while True:  # Change from False to True to ensure the loop executes
+    while True:
         # Define column groups
         numeric_columns = ["duration", "credit_amount", "installment_commitment", "residence_since", "age", "existing_credits", "num_dependents"]
         categorical_columns = [col for col in df.columns if col not in numeric_columns]
@@ -64,28 +82,20 @@ def transform(df):
         # Validate data after all transformations
         try:
             validate_data(df, expected_schema)
-        except ValidationError as e:
-            print(f"Validation error after transformation: {e}")
-            continue  # Continue the loop to re-check after transformations
-
-        # Convert specific float columns to integer
-        for col in ["duration", "credit_amount", "residence_since", "age", "existing_credits", "num_dependents"]:
-            if col in df.columns and pd.api.types.is_float_dtype(df[col]):
-                df[col] = df[col].fillna(0).astype(int)  # Fill NaNs with 0 before converting
-
-        # After transformations, re-validate the data
-        try:
-            validate_data(df, expected_schema)
-        except ValidationError as e:
-            print(f"Validation error after transformation: {e}")
-            continue  # Continue the loop to re-check after transformations
-
+            print("File has been transformed successfully.")
+            break  # Exit the loop if validation is successful
+        except:
+            print("There is an error transforming your file. We are trying again.")
+            continue
     return df
 
 ##### LOAD
 def load(df, output_path):
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned file is successfully loaded to {output_path}")
+    except:
+        print("There is an error loading your file. Please check before trying again.")
 
 # Main ETL process
 if __name__ == "__main__":
