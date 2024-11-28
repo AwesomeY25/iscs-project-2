@@ -1,5 +1,5 @@
 import pandas as pd
-from transform import clean_data, clean_boolean_columns, fill_missing_numeric, fill_missing_categorical, convert_float_to_int, split_personal_status, validate_data
+from transform import clean_data, fill_missing_numeric, fill_missing_categorical, convert_float_to_int, split_personal_status, validate_data
 
 # File paths
 input_file_path = "credit_customer_data.csv"
@@ -58,10 +58,6 @@ def extract(file_path):
 def transform(df):
     # Clean the data
     df = clean_data(df)
-    
-    # Clean specified boolean columns
-    boolean_to_clean = ['own_telephone', 'foreign_worker']
-    df = clean_boolean_columns(df, boolean_to_clean)
     
     # Convert specific float columns to integer
     floats_to_integers = ["duration", "credit_amount", "residence_since", "age", "existing_credits", "num_dependents"]

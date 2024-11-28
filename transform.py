@@ -108,35 +108,20 @@ def clean_data(df):
     })
 
     # Clean own_telephone
-    df['own_telephone'] = df['own_telephone'].replace({
-        'none': False})
-    df['own_telephone'] = df['own_telephone'].map({"yes": True, "no": False})
-    df['own_telephone'] = df['own_telephone'].fillna(False)
+    df['own_telephone'] = df['own_telephone'].astype(str).str.lower().str.strip()  # Convert to string and standardize
+    df['own_telephone'] = df['own_telephone'].replace({'yes': 1, 'none': 0})  # Map to 1 and 0
+    df['own_telephone'] = df['own_telephone'].fillna(0).astype(bool)  # Fill NaNs with 0 and convert to boolean
 
-     # Clean foreign_worker 
-    df['foreign_worker'] = df['foreign_worker'].replace({
-        'no': False,
-        'yes': True
-    })
-    df['foreign_worker'] = df['foreign_worker'].fillna(False)
-    
+    # Clean foreign_worker 
+    df['foreign_worker'] = df['foreign_worker'].astype(str).str.lower().str.strip()  # Convert to string and standardize
+    df['foreign_worker'] = df['foreign_worker'].replace({'yes': 1, 'no': 0})  # Map to 1 and 0
+    df['foreign_worker'] = df['foreign_worker'].fillna(0).astype(bool)  # Fill NaNs with 0 and convert to boolean
+
     # Clean housing
     df['housing'] = df['housing'].replace({
         'for free': 'free'
     })
 
-    return df
-
-def clean_boolean_columns(df, columns):
-    for col in columns:
-        if col in df.columns:
-            # Replace specific values and map to boolean
-            df[col] = df[col].replace({'none': False})
-            df[col] = df[col].map({"yes": True, "no": False})
-            
-            # Fill NaNs with False
-            df[col] = df[col].fillna(False)
-    
     return df
 
 def split_personal_status(df, column_name):
